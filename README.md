@@ -1319,3 +1319,809 @@ terraform apply -var-file="prod.tfvars"
 - The same Terraform code can be reused across different environments by changing only the tfvars file.
 - Runtime values override tfvars values, and tfvars values override default values.
 - This approach makes Terraform configurations cleaner, more maintainable, and easier to manage.
+
+
+
+------------------------------------------------------------------------------------------------
+
+# Terraform Dynamic Blocks
+
+## What are Dynamic Blocks?
+
+A **Dynamic Block** in Terraform is used to **generate one or more nested blocks automatically** using a loop.
+
+Normally, if you want to create multiple nested blocks (like `ingress` rules in a security group), you have to write each block manually.
+
+Dynamic blocks eliminate this repetition by creating the nested blocks automatically based on a list or map.
+
+Think of it as a **for loop for nested configuration blocks**.
+
+---
+
+# Why Do We Need Dynamic Blocks?
+
+Suppose you want to open multiple ports in an AWS Security Group.
+
+Without a dynamic block, you would have to write:
+
+```hcl
+ingress {
+  from_port   = 80
+  to_port     = 80
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+ingress {
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+
+ingress {
+  from_port   = 22
+  to_port     = 22
+  protocol    = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+```
+
+Imagine you have **100 ports**.
+
+Writing 100 ingress blocks is time-consuming and difficult to maintain.
+
+Instead, Terraform allows us to use **Dynamic Blocks**.
+
+---
+
+# Real-Time Example
+
+Suppose your DevOps team says:
+
+> Open ports:
+>
+> - 22
+> - 80
+> - 443
+> - 8080
+> - 9000
+
+Instead of writing five ingress blocks manually, you simply store the ports inside a variable.
+
+Terraform loops through each port and creates the ingress rules automatically.
+
+---
+
+# How Dynamic Blocks Work
+
+```text
+Variable
+(List/Map)
+      │
+      ▼
+Dynamic Block
+      │
+      ▼
+Terraform Loop
+      │
+      ▼
+Generates Multiple Nested Blocks
+      │
+      ▼
+AWS Security Group
+```
+
+---
+
+# Syntax of Dynamic Block
+
+```hcl
+dynamic "<Nested Block Name>" {
+
+  for_each = <Collection>
+
+  content {
+
+      # Block configuration
+
+  }
+
+}
+```
+
+---
+
+## Components
+
+### dynamic
+
+Starts a dynamic block.
+
+Example:
+
+```hcl
+dynamic "ingress"
+```
+
+Here,
+
+`ingress` is the nested block Terraform will generate.
+
+---
+
+### for_each
+
+Specifies the collection to loop through.
+
+Example:
+
+```hcl
+for_each = var.sg_ports
+```
+
+Terraform loops through every value inside:
+
+```text
+80
+443
+22
+```
+
+---
+
+### content
+
+Everything inside `content {}` becomes one generated nested block.
+
+---
+
+### .value
+
+Represents the current item in the loop.
+
+Example
+
+Current values:
+
+```
+80
+
+443
+
+22
+```
+
+First iteration:
+
+```
+ingress.value = 80
+```
+
+Second iteration:
+
+```
+ingress.value = 443
+```
+
+Third iteration:
+
+```
+ingress.value = 22
+```
+
+---
+
+# Demo 1: Dynamic Block Using List
+
+## Step 1 : Configure AWS Provider
+
+```hcl
+# Configure AWS Provider
+
+provider "aws" {
+
+  # AWS Region
+  region = "us-east-1"
+
+  # Credentials file
+  shared_credentials_files = ["~/.aws/credentials"]
+
+}
+```
+
+---
+
+## Step 2 : Create Variable
+
+```hcl
+# List of ports to open
+
+variable "sg_ports" {
+
+  type = list(number)
+
+  default = [
+
+    80,
+    443,
+    22
+
+  ]
+
+}
+```
+
+This variable contains three ports.
+
+```
+80
+
+443
+
+22
+```
+
+---
+
+## Step 3 : Create Security Group
+
+```hcl
+# Create Security Group
+
+resource "aws_security_group" "mysg" {
+
+  # Security Group Name
+  name = "custom-sg"
+
+  # Description
+  description = "Allow inbound traffic"
+
+  # Create multiple ingress blocks automatically
+  dynamic "ingress" {
+
+    # Loop through every port
+    for_each = var.sg_ports
+
+    content {
+
+      # Opening same port
+      from_port = ingress.value
+
+      # Ending port
+      to_port = ingress.value
+
+      # TCP Protocol
+      protocol = "tcp"
+
+      # Allow from anywhere
+      cidr_blocks = ["0.0.0.0/0"]
+
+    }
+
+  }
+
+}
+```
+
+---
+
+# What Happens Internally?
+
+Terraform reads
+
+```text
+80
+
+443
+
+22
+```
+
+and automatically creates
+
+```hcl
+ingress {
+
+  from_port = 80
+  to_port = 80
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+
+}
+
+ingress {
+
+  from_port = 443
+  to_port = 443
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+
+}
+
+ingress {
+
+  from_port = 22
+  to_port = 22
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+
+}
+```
+
+Notice:
+
+We never wrote these three blocks manually.
+
+Terraform generated them.
+
+---
+
+# Iteration Visualization
+
+```
+Loop 1
+
+ingress.value = 80
+
+↓
+
+Creates Port 80
+
+
+------------------------
+
+Loop 2
+
+ingress.value = 443
+
+↓
+
+Creates Port 443
+
+
+------------------------
+
+Loop 3
+
+ingress.value = 22
+
+↓
+
+Creates Port 22
+```
+
+---
+
+# Demo 2 : Dynamic Block Using Objects
+
+Sometimes each rule contains multiple properties.
+
+Example:
+
+```
+Port
+
+Protocol
+
+CIDR Block
+```
+
+A simple list cannot store all this information.
+
+Instead we use a **list of objects**.
+
+---
+
+## Variable
+
+```hcl
+# List of Security Group Rules
+
+variable "sg_config" {
+
+  default = [
+
+    {
+
+      port = 80
+
+      protocol = "tcp"
+
+      cidr_blocks = "0.0.0.0/0"
+
+    },
+
+    {
+
+      port = 8080
+
+      protocol = "udp"
+
+      cidr_blocks = "10.0.0.0/16"
+
+    },
+
+    {
+
+      port = 22
+
+      protocol = "tcp"
+
+      cidr_blocks = "10.0.0.0/20"
+
+    },
+
+    {
+
+      port = 443
+
+      protocol = "tcp"
+
+      cidr_blocks = "10.0.0.0/16"
+
+    }
+
+  ]
+
+}
+```
+
+---
+
+Each object stores
+
+```
+Port
+
+Protocol
+
+CIDR
+```
+
+---
+
+## Security Group
+
+```hcl
+# Create Security Group
+
+resource "aws_security_group" "mysg" {
+
+  name = "custom-sg"
+
+  description = "Allow inbound traffic"
+
+  # Generate ingress blocks dynamically
+  dynamic "ingress" {
+
+    # Loop through every object
+    for_each = var.sg_config
+
+    content {
+
+      # Current object's port
+      from_port = ingress.value.port
+
+      # Current object's port
+      to_port = ingress.value.port
+
+      # Current object's protocol
+      protocol = ingress.value.protocol
+
+      # Current object's CIDR
+      cidr_blocks = [
+
+        ingress.value.cidr_blocks
+
+      ]
+
+    }
+
+  }
+
+}
+```
+
+---
+
+# How Terraform Reads This
+
+Iteration 1
+
+```
+Port = 80
+
+Protocol = tcp
+
+CIDR = 0.0.0.0/0
+```
+
+Creates
+
+```hcl
+ingress {
+
+  from_port = 80
+
+  to_port = 80
+
+  protocol = "tcp"
+
+  cidr_blocks = ["0.0.0.0/0"]
+
+}
+```
+
+---
+
+Iteration 2
+
+```
+Port = 8080
+
+Protocol = udp
+
+CIDR = 10.0.0.0/16
+```
+
+Creates
+
+```hcl
+ingress {
+
+  from_port = 8080
+
+  to_port = 8080
+
+  protocol = "udp"
+
+  cidr_blocks = ["10.0.0.0/16"]
+
+}
+```
+
+Terraform continues until every object is converted into an ingress block.
+
+---
+
+# Dynamic Block Flow
+
+```text
+Variable (List of Objects)
+
+        │
+
+        ▼
+
+for_each
+
+        │
+
+        ▼
+
+Terraform Loop
+
+        │
+
+        ▼
+
+content{}
+
+        │
+
+        ▼
+
+Ingress Rule 1
+
+Ingress Rule 2
+
+Ingress Rule 3
+
+Ingress Rule 4
+
+        │
+
+        ▼
+
+AWS Security Group Created
+```
+
+---
+
+# Dynamic Block vs Static Block
+
+## Static Block
+
+```hcl
+ingress {
+
+  from_port = 80
+
+}
+
+ingress {
+
+  from_port = 443
+
+}
+
+ingress {
+
+  from_port = 22
+
+}
+```
+
+Advantages
+
+- Easy to read
+- Suitable for a few rules
+
+Disadvantages
+
+- Lots of duplicate code
+- Difficult to maintain
+
+---
+
+## Dynamic Block
+
+```hcl
+dynamic "ingress" {
+
+  for_each = var.sg_ports
+
+  content {
+
+    from_port = ingress.value
+
+  }
+
+}
+```
+
+Advantages
+
+- Less code
+- Reusable
+- Easy maintenance
+- Scales well
+
+Disadvantages
+
+- Slightly harder to understand for beginners
+- Complex logic can reduce readability
+
+---
+
+# Best Practices
+
+## 1. Use Dynamic Blocks Only When Needed
+
+Good Example
+
+Many ingress rules
+
+Many egress rules
+
+IAM policy statements
+
+Bad Example
+
+Only one ingress block
+
+Dynamic blocks add unnecessary complexity.
+
+---
+
+## 2. Use Structured Variables
+
+Instead of
+
+```text
+80
+
+443
+
+22
+```
+
+Prefer
+
+```text
+Port
+
+Protocol
+
+CIDR
+```
+
+This makes configurations more flexible.
+
+---
+
+## 3. Always Use `.value`
+
+Inside the `content` block, access the current loop item using `.value`.
+
+Example:
+
+```hcl
+from_port = ingress.value.port
+```
+
+---
+
+## 4. Keep Code Readable
+
+Add comments explaining why a dynamic block is used.
+
+Future maintainers will understand the logic more easily.
+
+---
+
+## 5. Test Using terraform plan
+
+Always run:
+
+```bash
+terraform plan
+```
+
+Verify that Terraform generates the expected nested blocks before applying changes.
+
+---
+
+## 6. Use Modules for Complex Logic
+
+If your dynamic block becomes too complex, consider moving the logic into a reusable Terraform module.
+
+---
+
+# Interview Questions
+
+## What is a Dynamic Block?
+
+A Dynamic Block is used to generate repeated nested blocks automatically using loops.
+
+---
+
+## Why use Dynamic Blocks?
+
+- Reduce duplicate code
+- Handle variable-length configurations
+- Improve reusability
+- Simplify maintenance
+
+---
+
+## What does `for_each` do in a Dynamic Block?
+
+It iterates over a collection (list, map, or set) and creates one nested block for each item.
+
+---
+
+## What is `.value`?
+
+`.value` represents the current item being processed during each iteration of the loop.
+
+---
+
+## When should Dynamic Blocks be used?
+
+- Multiple ingress or egress rules
+- IAM policy statements
+- Security group rules
+- Optional nested blocks
+- Repeated nested configurations
+
+---
+
+# Summary
+
+- Dynamic Blocks generate nested blocks automatically using loops.
+- They are useful for creating repeated configurations such as security group ingress and egress rules.
+- `for_each` iterates over a collection, and `.value` provides access to the current item.
+- Use Dynamic Blocks to reduce code duplication, but avoid overusing them for simple configurations.
+- Always verify generated blocks with `terraform plan` before applying changes.
