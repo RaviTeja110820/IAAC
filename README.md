@@ -772,3 +772,550 @@ Used to create multiple copies of a resource.
 ### What are Variables?
 
 Variables store reusable and dynamic values used in Terraform configurations.
+
+----------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------
+
+# Terraform tfvars File
+
+## What is a tfvars File?
+
+A **tfvars** file (Terraform Variables file) is used to **store values for variables separately from the Terraform code**.
+
+Instead of hardcoding values inside your Terraform configuration (`.tf` files), you can define only the variable names in `variables.tf` and provide their actual values in a separate **terraform.tfvars** file.
+
+This makes your Terraform code:
+
+- More reusable
+- Easier to maintain
+- More secure (especially when storing environment-specific values)
+- Easy to use across multiple environments (Dev, Test, Prod)
+
+---
+
+# Why Do We Need a tfvars File?
+
+Suppose you are creating an EC2 instance.
+
+Instead of writing:
+
+```hcl
+instance_type = "t2.micro"
+region        = "us-east-1"
+```
+
+inside your Terraform code, you can write:
+
+```hcl
+instance_type = var.instance_type
+region        = var.region
+```
+
+Now the actual values can come from a **terraform.tfvars** file.
+
+This means the same Terraform code can be reused for different environments simply by changing the values in the tfvars file.
+
+---
+
+# Variable Block
+
+Variables are declared inside a **variables.tf** file.
+
+A variable block can have:
+
+- A default value
+- No default value
+
+---
+
+## Example 1: Variable with Default Value
+
+### variables.tf
+
+```hcl
+# AWS Region
+
+variable "region" {
+
+  default = "us-east-1"
+
+}
+
+# EC2 Instance Type
+
+variable "instance_type" {
+
+  default = "t2.micro"
+
+}
+```
+
+### What happens?
+
+If no value is provided anywhere else, Terraform automatically uses the default values.
+
+Result:
+
+```
+Region          : us-east-1
+Instance Type   : t2.micro
+```
+
+---
+
+## Example 2: Variable Without Default Value
+
+### variables.tf
+
+```hcl
+# AWS Region
+
+variable "region" {
+
+}
+
+# EC2 Instance Type
+
+variable "instance_type" {
+
+}
+
+# Environment
+
+variable "environment" {
+
+}
+```
+
+Here we only declared the variables.
+
+No values are assigned.
+
+Terraform now expects these values from:
+
+- Runtime
+- tfvars file
+
+If no values are supplied, Terraform throws an error.
+
+Example:
+
+```
+Error: No value for required variable
+
+The root module input variable "region" is not set.
+```
+
+---
+
+# terraform.tfvars File
+
+Create a new file.
+
+```
+terraform.tfvars
+```
+
+Example:
+
+```hcl
+# AWS Region
+
+region = "us-east-1"
+
+# EC2 Instance Type
+
+instance_type = "t2.micro"
+
+# Environment
+
+environment = "development"
+```
+
+Notice:
+
+There is **NO variable block** here.
+
+Only variable names and values.
+
+---
+
+# How Terraform Uses tfvars
+
+Suppose we have:
+
+## variables.tf
+
+```hcl
+variable "region" {}
+
+variable "instance_type" {}
+
+variable "environment" {}
+```
+
+---
+
+## terraform.tfvars
+
+```hcl
+region = "us-east-1"
+
+instance_type = "t2.micro"
+
+environment = "dev"
+```
+
+---
+
+## main.tf
+
+```hcl
+# Configure AWS Provider
+
+provider "aws" {
+
+  # Region comes from tfvars file
+  region = var.region
+
+}
+
+# Create EC2 Instance
+
+resource "aws_instance" "myec2" {
+
+  # Amazon Machine Image
+  ami = "ami-0427090fd1714168b"
+
+  # Instance Type from tfvars
+  instance_type = var.instance_type
+
+  tags = {
+
+    # Environment Name from tfvars
+    Name = var.environment
+
+  }
+
+}
+```
+
+Run:
+
+```bash
+terraform plan
+```
+
+Terraform automatically loads:
+
+```
+terraform.tfvars
+```
+
+No extra command is required.
+
+---
+
+# Example Using Dev Environment
+
+## terraform.tfvars
+
+```hcl
+region = "us-east-1"
+
+instance_type = "t2.micro"
+
+environment = "dev"
+```
+
+Output:
+
+```
+Region          : us-east-1
+Instance Type   : t2.micro
+EC2 Name        : dev
+```
+
+---
+
+# Example Using Production Environment
+
+Change only the tfvars file.
+
+```hcl
+region = "us-west-2"
+
+instance_type = "t2.large"
+
+environment = "production"
+```
+
+Run again:
+
+```bash
+terraform apply
+```
+
+Now Terraform creates:
+
+```
+Region          : us-west-2
+Instance Type   : t2.large
+EC2 Name        : production
+```
+
+Notice:
+
+The Terraform code never changed.
+
+Only the tfvars file changed.
+
+---
+
+# Using Multiple tfvars Files
+
+In real projects, we usually maintain separate tfvars files.
+
+```
+terraform-project/
+
+│
+
+├── main.tf
+
+├── variables.tf
+
+├── dev.tfvars
+
+├── test.tfvars
+
+├── prod.tfvars
+
+└── outputs.tf
+```
+
+---
+
+## dev.tfvars
+
+```hcl
+region = "us-east-1"
+
+instance_type = "t2.micro"
+
+environment = "dev"
+```
+
+---
+
+## test.tfvars
+
+```hcl
+region = "us-east-2"
+
+instance_type = "t2.small"
+
+environment = "test"
+```
+
+---
+
+## prod.tfvars
+
+```hcl
+region = "us-west-2"
+
+instance_type = "t2.large"
+
+environment = "prod"
+```
+
+Run:
+
+Development
+
+```bash
+terraform apply -var-file="dev.tfvars"
+```
+
+Testing
+
+```bash
+terraform apply -var-file="test.tfvars"
+```
+
+Production
+
+```bash
+terraform apply -var-file="prod.tfvars"
+```
+
+---
+
+# Variable Value Precedence
+
+Terraform checks for variable values in the following order (highest to lowest priority):
+
+| Priority | Source | Example |
+|-----------|--------|---------|
+| **1 (Highest)** | Runtime (`-var`) | `terraform apply -var="region=us-east-2"` |
+| **2** | tfvars file | `terraform.tfvars`, `dev.tfvars` |
+| **3 (Lowest)** | Variable block default | `default = "us-east-1"` |
+
+---
+
+# Example of Variable Precedence
+
+## variables.tf
+
+```hcl
+variable "region" {
+
+  default = "us-east-1"
+
+}
+```
+
+---
+
+## terraform.tfvars
+
+```hcl
+region = "us-west-2"
+```
+
+Run:
+
+```bash
+terraform apply
+```
+
+Result:
+
+```
+Region = us-west-2
+```
+
+Why?
+
+Because **tfvars** has higher precedence than the default value.
+
+---
+
+Now run:
+
+```bash
+terraform apply -var="region=eu-west-1"
+```
+
+Result:
+
+```
+Region = eu-west-1
+```
+
+Why?
+
+Because **runtime value** has the highest precedence.
+
+---
+
+# Complete Flow
+
+```text
+variables.tf
+      │
+      │
+      ▼
+Variable Declaration
+      │
+      ▼
+terraform.tfvars
+      │
+      │
+      ▼
+Actual Values
+      │
+      ▼
+main.tf
+      │
+      ▼
+Terraform uses var.<variable_name>
+      │
+      ▼
+AWS Infrastructure Created
+```
+
+---
+
+# Best Practices
+
+- Declare variables in `variables.tf`.
+- Store values in `terraform.tfvars`.
+- Use different `.tfvars` files for Dev, Test, and Production.
+- Do not hardcode values in `main.tf`.
+- Do not commit sensitive `.tfvars` files (passwords, access keys, secrets) to Git.
+- Store secrets using environment variables, secret managers, or CI/CD secret stores instead.
+
+---
+
+# Interview Questions
+
+## What is a tfvars file?
+
+A tfvars file is used to store values for Terraform variables separately from the Terraform code.
+
+---
+
+## Why use tfvars?
+
+- Avoid hardcoding values
+- Support multiple environments
+- Improve reusability
+- Simplify maintenance
+
+---
+
+## What is the default tfvars filename?
+
+```
+terraform.tfvars
+```
+
+Terraform loads this file automatically if it exists.
+
+---
+
+## Can we have multiple tfvars files?
+
+Yes.
+
+Examples:
+
+- dev.tfvars
+- test.tfvars
+- prod.tfvars
+
+Use them with:
+
+```bash
+terraform apply -var-file="prod.tfvars"
+```
+
+---
+
+## What is the precedence order of variables?
+
+1. Runtime (`-var`)
+2. tfvars file (`terraform.tfvars` or `-var-file`)
+3. Default value in the variable block
+
+---
+
+# Summary
+
+- Variables are declared in `variables.tf`.
+- Actual values are stored in `terraform.tfvars`.
+- The same Terraform code can be reused across different environments by changing only the tfvars file.
+- Runtime values override tfvars values, and tfvars values override default values.
+- This approach makes Terraform configurations cleaner, more maintainable, and easier to manage.
