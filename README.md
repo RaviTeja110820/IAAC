@@ -2125,3 +2125,1012 @@ It iterates over a collection (list, map, or set) and creates one nested block f
 - `for_each` iterates over a collection, and `.value` provides access to the current item.
 - Use Dynamic Blocks to reduce code duplication, but avoid overusing them for simple configurations.
 - Always verify generated blocks with `terraform plan` before applying changes.
+
+
+# Terraform Modules
+
+## What are Terraform Modules?
+
+A **Terraform Module** is a collection of Terraform configuration files (`.tf`) stored in a separate directory that can be **reused** multiple times.
+
+Instead of writing the same infrastructure code again and again, you write it once as a module and call it whenever needed.
+
+Think of a module as a **function in programming**.
+
+Just like a function can be called multiple times with different parameters, a Terraform module can be called multiple times with different input values.
+
+---
+
+# Why Do We Need Modules?
+
+Suppose your company has:
+
+- Development Environment
+- Testing Environment
+- Production Environment
+
+All three environments need:
+
+- EC2 Instance
+- Security Group
+- IAM Role
+- VPC
+
+Without modules, you would copy the same Terraform code three times.
+
+Problems:
+
+- Duplicate code
+- Difficult maintenance
+- High chance of mistakes
+- Updating one environment requires updating all copies
+
+Modules solve this problem.
+
+Write once → Reuse everywhere.
+
+---
+
+# Real-Time Example
+
+Imagine a company has 50 developers.
+
+Every developer needs:
+
+- One EC2 Instance
+- One Security Group
+
+Instead of every developer writing Terraform code,
+
+The DevOps team creates reusable modules.
+
+```
+EC2 Module
+Security Group Module
+VPC Module
+IAM Module
+```
+
+Developers simply call these modules.
+
+This ensures:
+
+- Standard Infrastructure
+- Consistency
+- Easy Maintenance
+- Less Code
+
+---
+
+# Types of Modules
+
+Terraform has different types of modules.
+
+---
+
+## 1. Root Module
+
+The Terraform configuration directory where you execute commands like:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+is called the **Root Module**.
+
+Example
+
+```
+project/
+
+main.tf
+
+variables.tf
+
+outputs.tf
+
+terraform.tfvars
+```
+
+This is automatically considered the Root Module.
+
+---
+
+## 2. Child Module
+
+A module that is called from another Terraform configuration.
+
+Example
+
+```
+project/
+
+main.tf
+
+modules/
+
+ec2/
+
+sg/
+
+vpc/
+```
+
+Here,
+
+```
+ec2
+sg
+vpc
+```
+
+are Child Modules.
+
+---
+
+## 3. Local Module
+
+Stored on your own machine.
+
+Example
+
+```
+/root/modules/myec2
+```
+
+---
+
+## 4. Published Module
+
+Available on:
+
+Terraform Registry
+
+GitHub
+
+Private Git Repository
+
+Example
+
+```hcl
+module "vpc" {
+
+  source = "terraform-aws-modules/vpc/aws"
+
+}
+```
+
+Terraform downloads it automatically.
+
+---
+
+# Typical Module Structure
+
+```
+modules/
+
+└── myec2/
+
+    ├── main.tf
+
+    ├── variables.tf
+
+    ├── outputs.tf
+
+    ├── README.md
+```
+
+Each module usually contains:
+
+- Resource Blocks
+- Variables
+- Outputs
+- Documentation
+
+---
+
+# Module Workflow
+
+```
+Developer
+
+      │
+
+      ▼
+
+Root Module (main.tf)
+
+      │
+
+Calls Child Module
+
+      │
+
+      ▼
+
+Module Folder
+
+      │
+
+Creates Resources
+
+      │
+
+      ▼
+
+AWS Infrastructure
+```
+
+---
+
+# Demo 1 - Creating an EC2 Module
+
+## Step 1 Create Directories
+
+```bash
+# Go to home directory
+cd
+
+# Create directories
+mkdir modules dev prod
+
+# Enter modules directory
+cd modules
+
+# Create EC2 module
+mkdir myec2
+
+# Enter module
+cd myec2
+```
+
+---
+
+## Step 2 Create EC2 Module
+
+Create file
+
+```bash
+vim myec2.tf
+```
+
+### myec2.tf
+
+```hcl
+# Fetch latest Amazon Linux AMI
+
+data "aws_ami" "myami" {
+
+  # Get latest AMI
+  most_recent = true
+
+  # Amazon Owner
+  owners = ["amazon"]
+
+  filter {
+
+    # Filter by name
+    name = "name"
+
+    values = ["amzn2-ami-hvm*"]
+
+  }
+
+}
+
+# Create EC2 Instance
+
+resource "aws_instance" "test-ec2" {
+
+  # Use latest AMI
+  ami = data.aws_ami.myami.id
+
+  # Instance Type from Variable
+  instance_type = var.instance_type
+
+  tags = {
+
+    Name = "Instance-test"
+
+  }
+
+}
+```
+
+---
+
+## Step 3 Create Variables
+
+```bash
+vim variables.tf
+```
+
+```hcl
+# EC2 Instance Type
+
+variable "instance_type" {
+
+  default = "t2.micro"
+
+}
+```
+
+---
+
+## Module Path
+
+```
+/root/modules/myec2
+```
+
+This path will be used in the Root Module.
+
+---
+
+# Demo 2 - Creating Security Group Module
+
+Go back.
+
+```bash
+cd ..
+
+mkdir mysg
+
+cd mysg
+```
+
+Create file.
+
+```bash
+vim mysg.tf
+```
+
+---
+
+## mysg.tf
+
+```hcl
+# Create Security Group
+
+resource "aws_security_group" "mysg" {
+
+  # Security Group Name
+  name = "allow_tls"
+
+  # Allow incoming traffic
+  ingress {
+
+    # Start Port
+    from_port = local.port
+
+    # End Port
+    to_port = local.port
+
+    # TCP Protocol
+    protocol = "tcp"
+
+    # Allow Everyone
+    cidr_blocks = ["0.0.0.0/0"]
+
+  }
+
+}
+
+# Local Variable
+
+locals {
+
+  port = 8443
+
+}
+```
+
+---
+
+Create Variables
+
+```bash
+vim variables.tf
+```
+
+```hcl
+# Port Variable
+
+variable "port" {
+
+}
+```
+
+Module Path
+
+```
+/root/modules/mysg
+```
+
+---
+
+# Demo 3 - Calling Modules
+
+Go to root module.
+
+```bash
+cd
+
+mkdir dev
+
+cd dev
+```
+
+Create main.tf
+
+```bash
+vim main.tf
+```
+
+---
+
+## main.tf
+
+```hcl
+# AWS Provider
+
+provider "aws" {
+
+  region = "us-east-1"
+
+}
+
+# Call EC2 Module
+
+module "myec2module" {
+
+  # Local Module Path
+  source = "/root/modules/myec2"
+
+  # Override Variable
+  instance_type = "t2.large"
+
+}
+
+# Call Security Group Module
+
+module "mysgmodule" {
+
+  # Module Path
+  source = "/root/modules/mysg"
+
+  # Input Variable
+  port = 8080
+
+}
+```
+
+---
+
+Initialize Terraform
+
+```bash
+# Download providers and modules
+terraform init
+```
+
+Preview changes
+
+```bash
+terraform plan
+```
+
+Apply
+
+```bash
+terraform apply
+```
+
+---
+
+# What Happens Internally?
+
+Terraform reads:
+
+```
+main.tf
+
+↓
+
+EC2 Module
+
+↓
+
+Security Group Module
+
+↓
+
+Creates Resources
+```
+
+Flow
+
+```
+Root Module
+
+       │
+
+Calls
+
+       │
+
+EC2 Module
+
+       │
+
+Creates EC2
+
+--------------------
+
+Root Module
+
+       │
+
+Calls
+
+       │
+
+SG Module
+
+       │
+
+Creates Security Group
+```
+
+---
+
+# Demo 4 - Create Same Resource in Multiple Regions
+
+Instead of writing multiple provider blocks,
+
+Create a reusable module.
+
+---
+
+## Create Module
+
+```bash
+cd ~/modules
+
+mkdir region_module
+
+cd region_module
+```
+
+---
+
+## region.tf
+
+```hcl
+# Region Variable
+
+variable "region" {
+
+  type = string
+
+}
+
+# AWS Provider
+
+provider "aws" {
+
+  # Region from variable
+  region = var.region
+
+  # Credentials file
+  shared_credentials_files = ["~/.aws/credentials"]
+
+}
+
+# Fetch latest Amazon Linux AMI
+
+data "aws_ami" "myami" {
+
+  most_recent = true
+
+  owners = ["amazon"]
+
+  filter {
+
+    name = "name"
+
+    values = ["amzn2-ami-hvm*"]
+
+  }
+
+}
+
+# Create EC2 Instance
+
+resource "aws_instance" "myec2-1" {
+
+  # Latest AMI
+  ami = data.aws_ami.myami.id
+
+  # Instance Type
+  instance_type = "t2.micro"
+
+  tags = {
+
+    Name = "terraform1"
+
+  }
+
+}
+```
+
+---
+
+# Root Module
+
+```bash
+mkdir provider_demo
+
+cd provider_demo
+```
+
+---
+
+## main.tf
+
+```hcl
+# List of AWS Regions
+
+variable "regions" {
+
+  type = list(string)
+
+  default = [
+
+    "us-east-1",
+
+    "us-east-2",
+
+    "us-west-1"
+
+  ]
+
+}
+
+# Create EC2 in us-east-1
+
+module "aws_region_demo" {
+
+  source = "/root/modules/region_module"
+
+  region = var.regions[0]
+
+}
+
+# Create EC2 in us-east-2
+
+module "aws_region_demo1" {
+
+  source = "/root/modules/region_module"
+
+  region = var.regions[1]
+
+}
+```
+
+Terraform creates EC2 instances in different regions.
+
+---
+
+# Provider Alias
+
+Sometimes one project uses multiple AWS regions.
+
+Terraform allows multiple providers using aliases.
+
+```hcl
+# Default Provider
+
+provider "aws" {
+
+  region = "us-east-1"
+
+}
+
+# West Region
+
+provider "aws" {
+
+  alias = "west"
+
+  region = "us-west-1"
+
+}
+
+# East Region
+
+provider "aws" {
+
+  alias = "east"
+
+  region = "us-east-2"
+
+}
+```
+
+---
+
+# Using Provider Alias in Module
+
+```hcl
+# Create EC2 in Default Region
+
+module "mydev-ec2" {
+
+  source = "/root/modules/myec2-module"
+
+  instance_type = "t2.medium"
+
+  env = "dev01"
+
+}
+```
+
+---
+
+Use West Region
+
+```hcl
+# Create EC2 in us-west-1
+
+module "mydev-ec2-2" {
+
+  # Use west provider
+  providers = {
+
+    aws = aws.west
+
+  }
+
+  source = "/root/modules/myec2-module"
+
+  instance_type = "t2.medium"
+
+  env = "dev01"
+
+}
+```
+
+Terraform automatically uses the west provider.
+
+---
+
+# Module Outputs
+
+Modules can return values.
+
+Example
+
+```hcl
+# Output EC2 Details
+
+output "module-output" {
+
+  value = module.mydev-ec2.instance_data
+
+}
+```
+
+Security Group Output
+
+```hcl
+# Output Security Group ID
+
+output "module-output-sg" {
+
+  value = module.mydev-sg.sg_id
+
+}
+```
+
+Outputs from child modules become available in the root module.
+
+---
+
+# Module Execution Flow
+
+```
+terraform apply
+
+        │
+
+        ▼
+
+main.tf
+
+        │
+
+Calls Modules
+
+        │
+
+ ┌─────────────┐
+
+ │ EC2 Module  │
+
+ └─────────────┘
+
+        │
+
+Creates EC2
+
+        │
+
+ ┌─────────────┐
+
+ │ SG Module   │
+
+ └─────────────┘
+
+        │
+
+Creates Security Group
+
+        │
+
+        ▼
+
+AWS Infrastructure
+```
+
+---
+
+# Advantages of Modules
+
+- Reusable Infrastructure Code
+- Less Duplicate Code
+- Easy Maintenance
+- Standardization
+- Better Collaboration
+- Faster Development
+- Easier Testing
+- Supports Versioning
+- Cleaner Project Structure
+- Simplifies Multi-Environment Deployments
+
+---
+
+# Best Practices
+
+## Keep Modules Small
+
+Each module should focus on one responsibility.
+
+Good Examples:
+
+- EC2 Module
+- VPC Module
+- IAM Module
+- Security Group Module
+
+Avoid creating one huge module that manages everything.
+
+---
+
+## Use Variables
+
+Do not hardcode values.
+
+Instead of:
+
+```hcl
+instance_type = "t2.micro"
+```
+
+Use:
+
+```hcl
+instance_type = var.instance_type
+```
+
+---
+
+## Provide Outputs
+
+Expose useful values like:
+
+- Instance ID
+- Public IP
+- Security Group ID
+
+---
+
+## Write README.md
+
+Every module should include documentation explaining:
+
+- Purpose
+- Inputs
+- Outputs
+- Usage Example
+
+---
+
+## Version Your Modules
+
+When publishing modules, use version tags to ensure consistent deployments.
+
+---
+
+## Test Modules Independently
+
+Before using a module in production, validate it separately:
+
+```bash
+terraform init
+
+terraform validate
+
+terraform plan
+```
+
+---
+
+# Interview Questions
+
+## What is a Terraform Module?
+
+A Terraform Module is a reusable collection of Terraform configuration files that define infrastructure resources.
+
+---
+
+## What is the Root Module?
+
+The directory where Terraform commands (`terraform init`, `plan`, `apply`) are executed.
+
+---
+
+## What is a Child Module?
+
+A module that is called from another Terraform configuration using the `module` block.
+
+---
+
+## What is the difference between Local and Published Modules?
+
+**Local Module**
+- Stored on your local machine.
+- Referenced using a file path.
+
+**Published Module**
+- Hosted on the Terraform Registry, GitHub, or another remote repository.
+- Referenced using a source URL.
+
+---
+
+## Why Use Modules?
+
+- Reusability
+- Standardization
+- Maintainability
+- Collaboration
+- Reduced Code Duplication
+
+---
+
+## What is a Provider Alias?
+
+A Provider Alias allows you to configure multiple instances of the same provider (for example, multiple AWS regions) and assign specific resources or modules to use a particular provider configuration.
+
+---
+
+# Summary
+
+- Modules are reusable Terraform code packages.
+- A module typically contains resources, variables, outputs, and documentation.
+- The Root Module calls Child Modules using the `module` block.
+- Local Modules are stored on your machine, while Published Modules are hosted remotely.
+- Modules help reduce code duplication, improve consistency, and simplify infrastructure management.
+- Provider aliases enable deploying the same module across multiple cloud regions or accounts.
