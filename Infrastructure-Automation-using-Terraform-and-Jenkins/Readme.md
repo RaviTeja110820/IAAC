@@ -18,6 +18,72 @@ infrastructure to AWS - Monitor pipeline execution
 
 # Architecture
 
+```
+            Project 4.3 – Infrastructure Automation using Terraform and Jenkins
+
++----------------------+
+|      Developer       |
+| Updates Terraform    |
+| Code & Pushes to Git |
++----------+-----------+
+           |
+           | git push
+           ▼
++----------------------+
+|   GitHub Repository  |
+| Terraform Source     |
+|----------------------|
+| main.tf              |
+| variables.tf         |
+| outputs.tf           |
+| Jenkinsfile          |
++----------+-----------+
+           |
+           | Webhook / SCM Polling
+           ▼
++----------------------+
+|    Jenkins Server    |
+|----------------------|
+| Pipeline Execution   |
+| Build Automation     |
++----------+-----------+
+           |
+           ▼
++----------------------+
+| Terraform Pipeline   |
+|----------------------|
+| terraform init       |
+| terraform validate   |
+| terraform plan       |
+| terraform apply      |
++----------+-----------+
+           |
+           | AWS Credentials
+           ▼
++----------------------+
+|     AWS Provider     |
++----------+-----------+
+           |
+           ▼
++----------------------+
+| AWS Infrastructure   |
+|----------------------|
+| EC2 Instance         |
+| Security Group       |
+| VPC (Optional)       |
++----------+-----------+
+           |
+           ▼
++----------------------+
+| Terraform Outputs    |
+|----------------------|
+| Public IP            |
+| Instance ID          |
++----------------------+
+```
+
+
+
 ``` text
 Developer
    |

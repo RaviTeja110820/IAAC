@@ -13,7 +13,49 @@ modules from the root configuration - Define output variables -
 Understand Terraform state - Modify infrastructure safely
 
 ------------------------------------------------------------------------
+# Architecture
+```
+                     Project 4.1 – Terraform Modules (AWS EC2)
 
++----------------------+
+|     Developer        |
+| (Terraform Commands) |
++----------+-----------+
+           |
+           | terraform init / plan / apply
+           ▼
++----------------------+
+| Terraform Root Module|
+|      main.tf         |
++----------+-----------+
+           |
+           | Calls Module
+           ▼
++----------------------+
+|     EC2 Module       |
+|  modules/ec2/        |
+|----------------------|
+| main.tf              |
+| variables.tf         |
+| outputs.tf           |
++----------+-----------+
+           |
+           | Uses AWS Provider
+           ▼
++----------------------+
+|     AWS Cloud        |
+|----------------------|
+| VPC                  |
+| Security Group       |
+| EC2 Instance         |
++----------+-----------+
+           |
+           ▼
++----------------------+
+| Ubuntu EC2 Instance  |
+| (Application Server) |
++----------------------+
+```
 # Project Structure
 
 ``` text

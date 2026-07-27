@@ -43,6 +43,59 @@ terraform-workspaces/
 ```
 
 ------------------------------------------------------------------------
+# Architecture
+```
+           Project 4.2 – Managing Multiple Environments using Terraform Workspaces
+
+                         +---------------------------+
+                         |        Developer          |
+                         | terraform workspace       |
+                         | select / new / apply      |
+                         +------------+--------------+
+                                      |
+                                      ▼
+                         +---------------------------+
+                         | Terraform Configuration   |
+                         |---------------------------|
+                         | main.tf                   |
+                         | variables.tf              |
+                         | provider.tf               |
+                         | terraform.tfvars          |
+                         +------------+--------------+
+                                      |
+                                      ▼
+                         +---------------------------+
+                         | Terraform Workspaces      |
+                         +------------+--------------+
+                                      |
+                 +--------------------+--------------------+
+                 |                    |                    |
+                 ▼                    ▼                    ▼
+      +------------------+  +------------------+  +------------------+
+      | Development      |  | Staging          |  | Production       |
+      | Workspace         |  | Workspace        |  | Workspace        |
+      +---------+--------+  +---------+--------+  +---------+--------+
+                |                     |                     |
+                +----------+----------+----------+----------+
+                           |                     |
+                           ▼                     ▼
+                 +-----------------------------------------+
+                 |          AWS Infrastructure             |
+                 |-----------------------------------------|
+                 | EC2 Instance                            |
+                 | Security Group                          |
+                 | VPC (if configured)                     |
+                 +------------------+----------------------+
+                                    |
+                                    ▼
+                        +----------------------------+
+                        | Separate Terraform State   |
+                        | for Each Workspace         |
+                        +----------------------------+
+
+
+```
+
 
 # Project Flow
 

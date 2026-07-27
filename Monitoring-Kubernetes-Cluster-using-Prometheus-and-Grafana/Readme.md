@@ -13,6 +13,65 @@ monitor Kubernetes resources.
 -   Existing EKS cluster
 -   Terraform project
 
+## Architecture
+
+```
+            Project 4.4 – Monitoring Kubernetes Cluster using Prometheus & Grafana
+
++----------------------+
+|     Kubernetes       |
+|       Cluster        |
+|----------------------|
+| Control Plane        |
+| Worker Node(s)       |
++----------+-----------+
+           |
+           | Exposes Metrics
+           ▼
++----------------------+
+| Kubernetes Metrics   |
+|----------------------|
+| Pods                 |
+| Nodes                |
+| Deployments          |
+| Services             |
+| kube-state-metrics   |
+| Node Exporter        |
++----------+-----------+
+           |
+           | Scrape Metrics
+           ▼
++----------------------+
+|     Prometheus       |
+|----------------------|
+| Metric Collection    |
+| Time-Series Storage  |
+| PromQL Query Engine  |
++----------+-----------+
+           |
+           | Query Metrics
+           ▼
++----------------------+
+|      Grafana         |
+|----------------------|
+| Dashboards           |
+| Visualizations       |
+| Performance Metrics  |
++----------+-----------+
+           |
+           ▼
++----------------------+
+| DevOps Engineers     |
+|----------------------|
+| Monitor Cluster      |
+| Analyze Performance  |
+| Troubleshoot Issues  |
++----------------------+
+
+
+```
+
+
 ## 1. Verify Cluster
 
 ``` bash
